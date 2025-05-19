@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import it.unimi.dsi.fastutil.objects.*;
+import it.unimi.dsi.fastutil.ints.*;
 
 @AllArgsConstructor
 public class Jaccard implements SimilarityMeasure {
@@ -53,11 +55,48 @@ public class Jaccard implements SimilarityMeasure {
         // semantics consider them during the calculation. The solution should be able to calculate the Jaccard       //
         // similarity either of the two semantics by respecting the inner bagSemantics flag.                          //
 
+        if (strings1 == null || strings2 == null) {
+            return jaccardSimilarity;
+        }
+        // Empty arrays
+        if (strings1.length == 0 && strings2.length == 0) {
+            return 1.0;
+        }
 
+        if (!bagSemantics) {
+            // Set semantics: convert arrays to sets
+            Set<String> set1 = new HashSet<>(Arrays.asList(strings1));
+            Set<String> set2 = new HashSet<>(Arrays.asList(strings2));
 
-        //                                                                                                            //
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            Set<String> intersection = new HashSet<>(set1);
+            intersection.retainAll(set2);
 
+            Set<String> union = new HashSet<>(set1);
+            union.addAll(set2);
+
+            jaccardSimilarity = union.isEmpty() ? 1.0 : (double) intersection.size() / union.size();
+        } else {
+            // Bag (multiset) semantics: count token frequencies
+            Map<String, Long> freq1 = Arrays.stream(strings1)
+                    .collect(Collectors.groupingBy(s -> s, Collectors.counting()));
+            Map<String, Long> freq2 = Arrays.stream(strings2)
+                    .collect(Collectors.groupingBy(s -> s, Collectors.counting()));
+
+            Set<String> allTokens = Stream.concat(freq1.keySet().stream(), freq2.keySet().stream())
+                    .collect(Collectors.toSet());
+
+            long intersectionCount = 0;
+            for (String token : freq1.keySet()) {
+                if (freq2.containsKey(token)) {
+                    intersectionCount += Math.min(freq1.get(token), freq2.get(token));
+                }
+            }
+
+            long totalTokens = strings1.length + strings2.length;
+            jaccardSimilarity = (double) intersectionCount / totalTokens;
+        }
         return jaccardSimilarity;
     }
+
+
 }
